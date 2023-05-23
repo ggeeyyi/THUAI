@@ -868,11 +868,13 @@ bool isWindowInPath(IStudentAPI& api, std::queue<Point> p)
     {
         if ((int)api.GetPlaceType(q.front().x, q.front().y) == 7)
         {
+            std::cout << "window In Path!" << std::endl;
             return true;
         }
+        std::cout << "(" << q.front().x << "," << q.front().y << ")";
         q.pop();
-        std::cout << "popping" << std::endl;
     }
+    std::cout <<std::endl;
     return false;
 }
 bool isSurroundWindow(IStudentAPI& api)
@@ -880,18 +882,14 @@ bool isSurroundWindow(IStudentAPI& api)
     auto self = api.GetSelfInfo();
     int x = self->x / 1000;
     int y = self->y / 1000;
-    for (int i = x - 2; i <= x + 2; i++)
+    
+    Point window = findNearestPoint(api, 7);
+    if (Distance(Point(x, y), window) <=1.2)
     {
-        for (int j = y - 2; j <= y + 2; j++)
-        {
-            if (i >= 1 && i <= 49 && j >= 1 && j <= 49)
-            {
-                if ((int)api.GetPlaceType(i, j) == 7)
-                    return true;
-            }
-        }
+        return true;
     }
-    return false;
+    else
+        return false;
 }
 void receiveMessage(IStudentAPI& api)
 {
@@ -1552,6 +1550,25 @@ void avoid(IStudentAPI& api)
         }
     }
 }
+void avoidInGrass(IStudentAPI& api)
+{
+    double volume = api.GetSelfInfo()->dangerAlert;
+    if (volume != 0 && isReinitial == 0)
+    {
+        isAvoid = 1;
+        targetP = findNearestPoint(api, 3);
+        isReinitial = 1;
+        decision = 3;
+        BotStatus = status::initial;
+        return;
+    }
+    if (isReinitial == 1 && volume == 0)
+    {
+        isAvoid = 0;
+        isReinitial = 0;
+    }
+}
+
 void botInit(IStudentAPI& api) // 状态机的初始化
 {
     bool stuck = false;
@@ -1623,7 +1640,7 @@ void botInit(IStudentAPI& api) // 状态机的初始化
         BotStatus = status::retreat;
         return;
     }
-
+    /*
     if (isTrickerInsight == 1)
     {
         isAvoid = 1;
@@ -1637,7 +1654,8 @@ void botInit(IStudentAPI& api) // 状态机的初始化
     if (isTrigger(api, targetP))
     {
         isAvoid = 0;
-    }
+    }*/
+    avoidInGrass(api);
     /*
     if (isTrickerInsight(api) == 1 && isReinitial == 0)
     {
@@ -2026,7 +2044,16 @@ void teacherBot(IStudentAPI& api)
 void moveStatus(IStudentAPI& api)
 {
     auto self = api.GetSelfInfo();
+    int x = self->x / 1000;
+    int y = self->y / 1000;
     std::cout << "move!" << std::endl;
+    if (isWindowInPath(api, path))
+    {
+        isCrossingWindow = 1;
+    }
+    else
+        isCrossingWindow = 0;
+    std::cout << "isCrossingWindow" << isCrossingWindow << std::endl;
     std::cout << "isSurroundWindow:" << isSurroundWindow(api) << std::endl;
     if (isCrossingWindow == 1)
     {
@@ -2035,6 +2062,10 @@ void moveStatus(IStudentAPI& api)
             std::cout << "my skipping window!" << std::endl;
             api.SkipWindow();
             api.SkipWindow();
+            if (!path.empty())
+            {
+                path.pop();
+            }
         }
     }
     if (!path.empty())
@@ -2093,6 +2124,13 @@ void moveStatus(IStudentAPI& api)
 void retreatStatus(IStudentAPI& api)
 {
     std::cout << "retreat" << std::endl;
+    if (isWindowInPath(api, path))
+    {
+        isCrossingWindow = 1;
+    }
+    else
+        isCrossingWindow = 0;
+
     if (isCrossingWindow == 1)
     {
         if (isSurroundWindow(api) == 1 && isDelayedAfterWindow(api) == 1)
@@ -2133,13 +2171,6 @@ void initialStatus(IStudentAPI& api)
     int x = (api.GetSelfInfo()->x) / 1000;
     int y = (api.GetSelfInfo()->y) / 1000;
     path = bfs(Point(targetP.x, targetP.y), Point(x, y));
-    if (isWindowInPath(api, path))
-    {
-        isCrossingWindow = 1;
-    }
-    else
-        isCrossingWindow = 0;
-    std::cout << "isCrossingWindow" << isCrossingWindow << std::endl;
     IHaveArrived = false;
     BotStatus = status::move;
     printQueue(path);
